@@ -194,19 +194,19 @@ __dev_inPYTHONPATH() { __dev_isInStack "$1" PYTHONPATH; }
 # e.g. __dev_prependToStack ~/code/dev/bin PYTHONPATH
 __dev_prependToStack() {
 	eval local stack=\$$2
-	if [ -z $stack ]; then
+	if [ -z "$stack" ]; then
 		export $2="$1"
 	else
-		eval export $2="$1:\$$2"
+		eval "export $2=\"$1:\$$2\""
 	fi
 }
 
 # Like __dev_prependToStack but postfixes instead of prefixing
 __dev_postpendToStack() {
-	if [ -z $stack ]; then
+	if [ -z "$stack" ]; then
 		export $2="$1"
 	else
-		eval export $2="\$$2:$1"
+		eval "export $2=\"\$$2:$1\""
 	fi
 }
 
@@ -243,7 +243,7 @@ __dev_removeFromStack() {
 		if [ ! $removed ] && [ "$x" == "$1" ]; then
 			removed="true"
 		else
-			if [ -z $new_stack ]; then
+			if [ -z "$new_stack" ]; then
 				new_stack="$x"
 			else
 				new_stack="$new_stack:$x"
@@ -256,7 +256,7 @@ __dev_removeFromStack() {
 	elif [ ${#elements[@]} -eq 1 ]; then
 		unset $2
 	else
-		eval export $2="$new_stack"
+		eval "export $2=\"$new_stack\""
 	fi
 }
 
