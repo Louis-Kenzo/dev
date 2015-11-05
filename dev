@@ -22,34 +22,57 @@
 # and the content of $stack, which is intuitively $$stack, and is in practice
 # indirected using the idiom eval stack_content=\$$stack.
 
-# Pushes . on PATH and ./bin on PYTHONPATH
+# Pushes $1 (or by default .) on the dev stack
 #
 # Returns error-code 1 if both paths are already on their respective stacks.
 dev() {
-	local root=${1:-.}
-	if __dev_inPATH "$root" && __dev_inPYTHONPATH "$root/bin" ; then 
+	local root="${1:-.}"
+	if __dev_isInStack "$root" __DEV_DEVS; then 
 		echo "$(tput bold)$root$(tput sgr0) $(tput setaf 3)already in dev$(tput sgr0)"
 		return 1
 	fi
-	pushPATH $root
-	pushPYTHONPATH $root/bin
+	__dev_prependToStack $(readlink -f "$root") __DEV_DEVS
+	pushPATH "$root"
+	pushPYTHONPATH "$root/bin"
 }
 
-# Pops . from PATH and ./bin from PYTHONPATH
+# Pops $1 (or by default the top of the dev stack) off the dev stack
 #
-# Returns error-code 1 if both paths are already off their respective stacks.
+# Returns error-code 1 if $1 is not a dev on the dev stack.
+# Returns error-code 2 if no argument is given and the dev stack is empty
 undev() {
-	local root=${1:-.}
-	if ! __dev_inPATH "$root" && ! __dev_inPYTHONPATH "$root/bin" ; then 
+	if [ $# -eq 0 ] && [ $(__dev_stackDepth __DEV_DEVS) -le 0 ]; then
+		echo "$(tput bold)$(tput setaf 1)No dev to undev$(tput sgr0)"
+		return 2
+	fi
+	local IFS_BACKUP="$IFS"; IFS=":"; local devs=($__DEV_DEVS); IFS=$IFS_BACKUP
+	local root="${1:-${devs[0]}}"
+	if ! __dev_isInStack "$root" __DEV_DEVS ; then 
 		echo "$(tput bold)$root$(tput sgr0) $(tput setaf 3)already off dev$(tput sgr0)"
 		return 1
 	fi
-	popPATH $root
-	popPYTHONPATH $root/bin
+	popPATH "$root"
+	popPYTHONPATH "$root/bin"
+	__dev_removeFromStack $(readlink -f "$root") __DEV_DEVS
 }
+
+if hash complete &>/dev/null; then
+	__dev_undevComplete() {
+		local cur=${COMP_WORDS[COMP_CWORD]}
+		local prev=${COMP_WORDS[COMP_CWORD-1]}
+
+		if [ $COMP_CWORD -eq 1 ]; then
+			local IFS_BACKUP="$IFS"
+			IFS=":"; local devs=($__DEV_DEVS); IFS=$IFS_BACKUP
+			COMPREPLY=( $(compgen -W "${devs[*]}" -- $cur) )
+		fi
+	}
+	complete -o nospace -F __dev_undevComplete undev
+fi
 
 # Prints the values of PATH and PYTHONPATH, as well as all tracked stacks
 devStatus() {
+	__dev_devsStatus
 	__dev_stacksStatus
 	__dev_pathsStatus
 }
@@ -63,21 +86,22 @@ devStatus() {
 #
 # e.g. pushOn ~/code/project PATH
 pushOn() {
+	local root="$(readlink -f $1)"
 	local stack="$2"
 
 	# Return an error, warn the user if the path is already is in the stack
-	if __dev_isInStack "$1" $(__dev_stackName $stack); then 
-		echo "$(tput bold)$1$(tput sgr0) $(tput setaf 1)is already in$(tput sgr0) $(tput bold)$stack$(tput sgr0)"
+	if __dev_isInStack "$root" $(__dev_stackName $stack); then 
+		echo "$(tput bold)$root$(tput sgr0) $(tput setaf 1)is already in$(tput sgr0) $(tput bold)$stack$(tput sgr0)"
 		return 1
 	fi
 
-	# Add $1 to the stack, track it by adding it also to the stack tracker
+	# Add $root to the stack, track it by adding it also to the stack tracker
 	# and add the stack tracker to __DEV_STACKS if it's not already there
-	__dev_prependToStack $(readlink -f "$1") "$stack"
-	__dev_prependToStack $(readlink -f "$1") $(__dev_stackName "$stack")
+	__dev_prependToStack "$root" "$stack"
+	__dev_prependToStack "$root" $(__dev_stackName "$stack")
 	if ! __dev_isInStack "$stack" __DEV_STACKS; then __dev_prependToStack "$stack" __DEV_STACKS; fi
 	
-	echo "Pushed $(tput bold)$1$(tput sgr0) on $(tput bold)$2$(tput sgr0)"
+	echo "Pushed $(tput bold)${root/$HOME/\~}$(tput sgr0) on $(tput bold)$2$(tput sgr0)"
 	return 0
 }
 
@@ -108,12 +132,11 @@ pushPYTHONPATH() { pushOn "$1" PYTHONPATH; }
 # If the stack is empty, returns 2.
 # If the stack doesn't contain $1, returns 1.
 #
-# e.g. popFrom ~/code/project PATH
+# e.g. popFrom PATH ~/code/project
 popFrom() {
 	# Parse the stack
 	eval local stack=\$$(__dev_stackName $1)
-	local IFS_BACKUP="$IFS"
-	IFS=":"; local elements=($stack); IFS=$IFS_BACKUP
+	local IFS_BACKUP="$IFS"; IFS=":"; local elements=($stack); IFS=$IFS_BACKUP
 	
 	if [ "${#elements[@]}" -le 0 ]; then
 		echo "$(tput setaf 3)Empty stack for $(tput bold)$1$(tput sgr0)"
@@ -122,7 +145,7 @@ popFrom() {
 		# Remove $1 from the stack, update the stack tracker by
 		# removing it from there too, and $1 was the last path in the
 		# stack tracker, remove the stack tracker from __DEV_STACKS
-		local element_to_pop="${2:-${elements[0]}}"
+		local element_to_pop="$(readlink -f ${2:-${elements[0]}})"
 
 		if ! __dev_isInStack "$element_to_pop" $(__dev_stackName $1); then 
 			echo "$(tput bold)$element_to_pop$(tput sgr0) $(tput setaf 1)is not in$(tput sgr0) $(tput bold)$1$(tput sgr0)"
@@ -133,7 +156,7 @@ popFrom() {
 		__dev_removeFromStack "$element_to_pop" $(__dev_stackName $1)
 		if [ $(__dev_stackDepth $(__dev_stackName $1)) -le 0 ]; then __dev_removeFromStack $1 __DEV_STACKS; fi
 		
-		echo "Removed $(tput bold)$element_to_pop$(tput sgr0) from $(tput bold)$1$(tput sgr0)"
+		echo "Removed $(tput bold)${element_to_pop/$HOME/\~}$(tput sgr0) from $(tput bold)$1$(tput sgr0)"
 		return 0
 	fi
 }
@@ -144,7 +167,9 @@ if hash complete &>/dev/null; then
 		local prev=${COMP_WORDS[COMP_CWORD-1]}
 
 		if [ $COMP_CWORD -eq 1 ]; then
-			COMPREPLY=( $(compgen -W "$__DEV_STACKS" -- $cur) )
+			local IFS_BACKUP="$IFS"
+			IFS=":"; local elements=($__DEV_STACKS); IFS=$IFS_BACKUP
+			COMPREPLY=( $(compgen -W "${elements[@]}" -- $cur) )
 		elif __dev_isInStack $prev __DEV_STACKS; then
 			eval local stack=\$$(__dev_stackName $prev)
 			local IFS_BACKUP="$IFS"
@@ -155,8 +180,8 @@ if hash complete &>/dev/null; then
 	complete -F __dev_popFromComplete popFrom
 fi
 
-popPATH(){ popFrom PATH; }
-popPYTHONPATH() { popFrom PYTHONPATH; }
+popPATH(){ popFrom PATH "$1"; }
+popPYTHONPATH() { popFrom PYTHONPATH "$1"; }
 
 # Checks that $1 is a path canonically-equivalent to one in the stack named $2
 #
@@ -270,6 +295,16 @@ __dev_stackName() {
 
 # Tools
 
+__dev_variable_status() {
+	echo -n "$(tput bold; tput setaf 4)$1: $(tput sgr0)"
+	eval variable_defined=\${$1+undefined}
+	if [ -z $variable_defined ]; then
+		echo "$(tput setaf 1)undefined$(tput sgr0)"
+	else
+		eval echo \$$1
+	fi
+}
+
 __dev_symbol_status() {
 	echo -n "$(tput bold; tput setaf 4)$1: $(tput sgr0)"
 	if type $1 &>/dev/null; then
@@ -279,7 +314,8 @@ __dev_symbol_status() {
 	fi
 }
 
-dev_functions="__dev_isInStack __dev_inPATH __dev_inPYTHONPATH __dev_prependToStack __dev_postpendToStack __dev_prependPATH __dev_prependPYTHONPATH __dev_stackDepth __dev_removeFromStack __dev_removeFromPATH __dev_removeFromPYTHONPATH __dev_stackName pushOn pushPATH pushPYTHONPATH popFrom popPATH popPYTHONPATH __dev_symbol_status __dev_pathsStatus __dev_stacksStatus __dev_status __dev_cleanup devStatus dev undev"
+dev_functions="__dev_isInStack __dev_inPATH __dev_inPYTHONPATH __dev_prependToStack __dev_postpendToStack __dev_prependPATH __dev_prependPYTHONPATH __dev_stackDepth __dev_removeFromStack __dev_removeFromPATH __dev_removeFromPYTHONPATH __dev_stackName pushOn pushPATH pushPYTHONPATH popFrom popPATH popPYTHONPATH __dev_variable_status __dev_symbol_status __dev_pathsStatus __dev_devsStatus __dev_stacksStatus __dev_status __dev_cleanup devStatus dev undev"
+dev_variables="__DEV_STACKS __DEV_DEVS"
 
 __dev_pathsStatus() {
 	echo "$(tput bold)$(tput setaf 6)Paths$(tput sgr0)"
@@ -289,8 +325,20 @@ __dev_pathsStatus() {
 		# Parse the stack
 		local IFS_BACKUP="$IFS";IFS=":"; local stacks=($__DEV_STACKS); IFS=$IFS_BACKUP
 		for s in "${stacks[@]}"; do
-			eval local stack_string=\$$(__dev_stackName $s)
+			eval local stack_string=\$$s
 			echo -e "\t$(tput bold)$(tput setaf 4)$s:$(tput sgr0) ${stack_string:-$(tput setaf 1)undefined$(tput sgr0)}"
+		done
+	fi
+}
+
+__dev_devsStatus() {
+	echo -e "$(tput bold)$(tput setaf 6)Devs$(tput sgr0)"
+	if [ -z $__DEV_DEVS ]; then
+		echo -e "\t$(tput setaf 1)No devs$(tput sgr0)"
+	else
+		IFS_BACKUP="$IFS";IFS=":"; devs=($__DEV_DEVS); IFS=$IFS_BACKUP
+		for d in "${devs[@]}"; do
+			echo -e "$(tput bold)$(tput setaf 2)\t${d/$HOME/\~}$(tput sgr0)"
 		done
 	fi
 }
@@ -298,7 +346,7 @@ __dev_pathsStatus() {
 __dev_stacksStatus() {
 	echo -e "$(tput bold)$(tput setaf 6)Tracked stacks$(tput sgr0)"
 	if [ -z $__DEV_STACKS ]; then
-		echo -e "\t$(tput setaf 1)No dev stack$(tput sgr0)"
+		echo -e "\t$(tput setaf 1)No stack$(tput sgr0)"
 	else
 		# Parse the stack
 		local IFS_BACKUP="$IFS";IFS=":"; local stacks=($__DEV_STACKS); IFS=$IFS_BACKUP
@@ -321,27 +369,37 @@ __dev_stacksStatus() {
 }
 
 __dev_metaStatus() {
-	echo "$(tput bold)$(tput setaf 6)Functions & variables$(tput sgr0)"
+	echo "$(tput bold)$(tput setaf 6)Functions$(tput sgr0)"
 	for f in $dev_functions; do
 		echo -e "\t$(__dev_symbol_status $f)"
+	done
+
+	echo "$(tput bold)$(tput setaf 6)Meta-variables$(tput sgr0)"
+	for e in $dev_variables; do
+		echo -e "\t$(__dev_variable_status $e)"
 	done
 }
 
 __dev_status() {
-	__dev_stacksStatus
-	__dev_pathsStatus
 	__dev_metaStatus
 }
 
 __dev_cleanup() {
+	# Cleanup functions
+	
 	for f in $dev_functions; do
 		unset $f
 	done
 
+	# Cleanup stacks
 	# Parse the stack
 	local IFS_BACKUP="$IFS";IFS=":"; local stacks=($__DEV_STACKS); IFS=$IFS_BACKUP
 	for s in "${stacks[@]}"; do
 		unset $s
 	done
-	unset __DEV_STACKS
+
+	# Cleanup meta variables
+	for e in $dev_variables; do
+		unset $e
+	done
 }
