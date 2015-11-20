@@ -289,7 +289,7 @@ __dev_pathsStatus() {
 		# Parse the stack
 		local IFS_BACKUP="$IFS";IFS=":"; local stacks=($__DEV_STACKS); IFS=$IFS_BACKUP
 		for s in "${stacks[@]}"; do
-			eval local stack_string=\$$(__dev_stackName $s)
+			eval local stack_string=\$$s
 			echo -e "\t$(tput bold)$(tput setaf 4)$s:$(tput sgr0) ${stack_string:-$(tput setaf 1)undefined$(tput sgr0)}"
 		done
 	fi
