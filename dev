@@ -26,26 +26,26 @@
 #
 # Returns error-code 1 if both paths are already on their respective stacks.
 dev() {
-	local root=${1:-.}
-	if __dev_inPATH "$root" && __dev_inPYTHONPATH "$root/bin" ; then 
+	local root=$(readlink -f "${1:-.}")
+	if __dev_inPATH "$root/bin" && __dev_inPYTHONPATH "$root" ; then 
 		echo "$(tput bold)$root$(tput sgr0) $(tput setaf 3)already in dev$(tput sgr0)"
 		return 1
 	fi
-	pushPATH $root
-	pushPYTHONPATH $root/bin
+	pushPATH $root/bin
+	pushPYTHONPATH $root
 }
 
 # Pops . from PATH and ./bin from PYTHONPATH
 #
 # Returns error-code 1 if both paths are already off their respective stacks.
 undev() {
-	local root=${1:-.}
-	if ! __dev_inPATH "$root" && ! __dev_inPYTHONPATH "$root/bin" ; then 
+	local root=$(readlink -f ${1:-.})
+	if ! __dev_inPATH "$root/bin" && ! __dev_inPYTHONPATH "$root" ; then 
 		echo "$(tput bold)$root$(tput sgr0) $(tput setaf 3)already off dev$(tput sgr0)"
 		return 1
 	fi
-	popPATH $root
-	popPYTHONPATH $root/bin
+	popPATH $root/bin
+	popPYTHONPATH $root
 }
 
 # Prints the values of PATH and PYTHONPATH, as well as all tracked stacks
