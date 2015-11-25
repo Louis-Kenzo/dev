@@ -54,30 +54,30 @@ dev-status() {
 	__dev_pathsStatus
 }
 
-# Prepends $1 to the stack named $2 and its tracker stack
+# Prepends $2 to the stack named $1 and its tracker stack
 #
 # If the tracker stack didn't exist yet, it's added to the environment variable
 # __DEV_STACKS after being created.
 #
-# If $1 is already in the tracker, the error-code 1 is returned.
+# If $2 is already in the tracker, the error-code 1 is returned.
 #
-# e.g. pushon ~/code/project PATH
+# e.g. pushon PATH ~/code/project
 pushon() {
-	local stack="$2"
+	local stack="$1"
 
 	# Return an error, warn the user if the path is already is in the stack
-	if __dev_isInStack "$1" $(__dev_stackName $stack); then 
-		echo "$(tput bold)$1$(tput sgr0) $(tput setaf 1)is already in$(tput sgr0) $(tput bold)$stack$(tput sgr0)"
+	if __dev_isInStack "$2" $(__dev_stackName $stack); then 
+		echo "$(tput bold)$2$(tput sgr0) $(tput setaf 1)is already in$(tput sgr0) $(tput bold)$stack$(tput sgr0)"
 		return 1
 	fi
 
-	# Add $1 to the stack, track it by adding it also to the stack tracker
+	# Add $2 to the stack, track it by adding it also to the stack tracker
 	# and add the stack tracker to __DEV_STACKS if it's not already there
-	__dev_prependToStack $(readlink -f "$1") "$stack"
-	__dev_prependToStack $(readlink -f "$1") $(__dev_stackName "$stack")
+	__dev_prependToStack $(readlink -f "$2") "$stack"
+	__dev_prependToStack $(readlink -f "$2") $(__dev_stackName "$stack")
 	if ! __dev_isInStack "$stack" __DEV_STACKS; then __dev_prependToStack "$stack" __DEV_STACKS; fi
 	
-	echo "Pushed $(tput bold)$1$(tput sgr0) on $(tput bold)$2$(tput sgr0)"
+	echo "Pushed $(tput bold)$2$(tput sgr0) on $(tput bold)$1$(tput sgr0)"
 	return 0
 }
 
@@ -87,16 +87,16 @@ if hash complete &>/dev/null; then
 		local prev=${COMP_WORDS[COMP_CWORD-1]}
 
 		if [ $COMP_CWORD -eq 1 ]; then
-			COMPREPLY=( $(compgen -o dirnames $cur -- .) )
-		elif [ $COMP_CWORD -eq 2 ]; then
 			COMPREPLY=( $(compgen -W "$(env | cut -d= -f1 | grep -E *PATH)" -- $cur) )
+		elif [ $COMP_CWORD -eq 2 ]; then
+			COMPREPLY=( $(compgen -o dirnames $cur -- .) )
 		fi
 	}
 	complete -o nospace -F __dev_pushOnComplete pushon
 fi
 
-pushonPATH() { pushon "$1" PATH; }
-pushonPYTHONPATH() { pushon "$1" PYTHONPATH; }
+pushonPATH() { pushon PATH "$1"; }
+pushonPYTHONPATH() { pushon PYTHONPATH "$1"; }
 
 # Removes from the stack named $1 and its tracker, $2 or the first tracker path
 #
