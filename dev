@@ -10,13 +10,13 @@
 # used by the client are directly exposed:
 # - dev
 # - undev
-# - devStatus
-# - pushOn
-# - pushPATH
-# - pushPYTHONPATH
-# - popOn
-# - popPATH
-# - popPYTHONPATH
+# - dev-status
+# - pushon
+# - pushonPATH
+# - pushonPYTHONPATH
+# - popfrom
+# - popfromPATH
+# - popfromPYTHONPATH
 
 # Keep in mind there is one level of indirection between a stack named $stack
 # and the content of $stack, which is intuitively $$stack, and is in practice
@@ -31,8 +31,8 @@ dev() {
 		echo "$(tput bold)$root$(tput sgr0) $(tput setaf 3)already in dev$(tput sgr0)"
 		return 1
 	fi
-	pushPATH $root/bin
-	pushPYTHONPATH $root
+	pushonPATH $root/bin
+	pushonPYTHONPATH $root
 }
 
 # Pops . from PATH and ./bin from PYTHONPATH
@@ -44,12 +44,12 @@ undev() {
 		echo "$(tput bold)$root$(tput sgr0) $(tput setaf 3)already off dev$(tput sgr0)"
 		return 1
 	fi
-	popPATH $root/bin
-	popPYTHONPATH $root
+	popfromPATH $root/bin
+	popfromPYTHONPATH $root
 }
 
 # Prints the values of PATH and PYTHONPATH, as well as all tracked stacks
-devStatus() {
+dev-status() {
 	__dev_stacksStatus
 	__dev_pathsStatus
 }
@@ -61,8 +61,8 @@ devStatus() {
 #
 # If $1 is already in the tracker, the error-code 1 is returned.
 #
-# e.g. pushOn ~/code/project PATH
-pushOn() {
+# e.g. pushon ~/code/project PATH
+pushon() {
 	local stack="$2"
 
 	# Return an error, warn the user if the path is already is in the stack
@@ -92,11 +92,11 @@ if hash complete &>/dev/null; then
 			COMPREPLY=( $(compgen -W "$(env | cut -d= -f1 | grep -E *PATH)" -- $cur) )
 		fi
 	}
-	complete -o nospace -F __dev_pushOnComplete pushOn
+	complete -o nospace -F __dev_pushOnComplete pushon
 fi
 
-pushPATH() { pushOn "$1" PATH; }
-pushPYTHONPATH() { pushOn "$1" PYTHONPATH; }
+pushonPATH() { pushon "$1" PATH; }
+pushonPYTHONPATH() { pushon "$1" PYTHONPATH; }
 
 # Removes from the stack named $1 and its tracker, $2 or the first tracker path
 #
@@ -108,8 +108,8 @@ pushPYTHONPATH() { pushOn "$1" PYTHONPATH; }
 # If the stack is empty, returns 2.
 # If the stack doesn't contain $1, returns 1.
 #
-# e.g. popFrom ~/code/project PATH
-popFrom() {
+# e.g. popfrom ~/code/project PATH
+popfrom() {
 	# Parse the stack
 	eval local stack=\$$(__dev_stackName $1)
 	local IFS_BACKUP="$IFS"
@@ -152,11 +152,11 @@ if hash complete &>/dev/null; then
 			COMPREPLY=( $(compgen -W "${elements[@]}" -- $cur) )
 		fi
 	}
-	complete -F __dev_popFromComplete popFrom
+	complete -F __dev_popFromComplete popfrom
 fi
 
-popPATH(){ popFrom PATH; }
-popPYTHONPATH() { popFrom PYTHONPATH; }
+popfromPATH(){ popfrom PATH; }
+popfromPYTHONPATH() { popfrom PYTHONPATH; }
 
 # Checks that $1 is a path canonically-equivalent to one in the stack named $2
 #
@@ -227,7 +227,7 @@ __dev_stackDepth() {
 # Removes the first instance of $1 in the stack named $2
 #
 # If no element of the stack named $2 is equal to $1, returns error-code 1.
-# Beware, contrary to __dev_isInStack and pushOn, this function works on 
+# Beware, contrary to __dev_isInStack and pushon, this function works on 
 # literal paths and does not try to compare canonicalized paths.
 #
 # e.g. __dev_removeFromStack /home/user/code/dev PATH
@@ -279,7 +279,7 @@ __dev_symbol_status() {
 	fi
 }
 
-dev_functions="__dev_isInStack __dev_inPATH __dev_inPYTHONPATH __dev_prependToStack __dev_postpendToStack __dev_prependPATH __dev_prependPYTHONPATH __dev_stackDepth __dev_removeFromStack __dev_removeFromPATH __dev_removeFromPYTHONPATH __dev_stackName pushOn pushPATH pushPYTHONPATH popFrom popPATH popPYTHONPATH __dev_symbol_status __dev_pathsStatus __dev_stacksStatus __dev_status __dev_cleanup devStatus dev undev"
+dev_functions="__dev_isInStack __dev_inPATH __dev_inPYTHONPATH __dev_prependToStack __dev_postpendToStack __dev_prependPATH __dev_prependPYTHONPATH __dev_stackDepth __dev_removeFromStack __dev_removeFromPATH __dev_removeFromPYTHONPATH __dev_stackName pushon pushonPATH pushonPYTHONPATH popfrom popfromPATH popfromPYTHONPATH __dev_symbol_status __dev_pathsStatus __dev_stacksStatus __dev_status __dev_cleanup dev-status dev undev"
 
 __dev_pathsStatus() {
 	echo "$(tput bold)$(tput setaf 6)Paths$(tput sgr0)"
