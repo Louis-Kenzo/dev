@@ -179,13 +179,13 @@ if hash complete &>/dev/null; then
 	complete -F __dev_popFromComplete popfrom
 fi
 
-popfromPATH(){ popfrom PATH; }
-popfromPYTHONPATH() { popfrom PYTHONPATH; }
+popfromPATH(){ popfrom PATH "$1"; }
+popfromPYTHONPATH() { popfrom PYTHONPATH "$1"; }
 
 # Checks that $1 is a path canonically-equivalent to one in the stack named $2
 #
 # Canonical-equivalence is the equality of paths resolved using readlink -f.
-# 
+#
 # Returns the result as a return code:
 # - 0: $1 canonically-equivalent to one of the paths in the stack named #2
 # - 1: $1 is not canonically-equivalent to any of the paths in the stack named
