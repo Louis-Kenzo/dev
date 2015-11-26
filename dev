@@ -1,8 +1,8 @@
 # Stacks are colon separated lists of variables. For example, PATH and
 # PYTHONPATH are stacks.
 
-# dev adds and removes paths to stacks, and tracks those additions in stack 
-# tracker environment variables, whose names are given by a call to 
+# dev adds and removes paths to stacks, and tracks those additions in stack
+# tracker environment variables, whose names are given by a call to
 # __dev_stackName. Stack trackers are themselves tracked in the __DEV_STACKS
 # environment variable.
 
@@ -22,31 +22,55 @@
 # and the content of $stack, which is intuitively $$stack, and is in practice
 # indirected using the idiom eval stack_content=\$$stack.
 
-# Pushes . on PATH and ./bin on PYTHONPATH
+# Pushes $1/bin and $1 (or by default ./bin and .) on PATH and PYTHONPATH
+# respectively
 #
 # Returns error-code 1 if both paths are already on their respective stacks.
 dev() {
-	local root=$(readlink -f "${1:-.}")
-	if __dev_inPATH "$root/bin" && __dev_inPYTHONPATH "$root" ; then 
+	local root="$(readlink -f "${1:-.}")"
+	if __dev_isInStack "$root" __DEV_DEVS; then
 		echo "$(tput bold)$root$(tput sgr0) $(tput setaf 3)already in dev$(tput sgr0)"
 		return 1
 	fi
-	pushonPATH $root/bin
-	pushonPYTHONPATH $root
+	__dev_prependToStack "$root" __DEV_DEVS
+	pushonPATH "$root/bin"
+	pushonPYTHONPATH "$root"
 }
 
-# Pops . from PATH and ./bin from PYTHONPATH
+# Pops $1/bin and $1 (or by default ./bin and .) from PATH and PYTHONPATH
+# respectively
 #
 # Returns error-code 1 if both paths are already off their respective stacks.
 undev() {
-	local root=$(readlink -f ${1:-.})
-	if ! __dev_inPATH "$root/bin" && ! __dev_inPYTHONPATH "$root" ; then 
+	if [ $# -eq 0 ] && [ $(__dev_stackDepth __DEV_DEVS) -le 0 ]; then
+		echo "$(tput bold)$(tput setaf 1)No dev to undev$(tput sgr0)"
+		return 2
+	fi
+
+	local IFS_BACKUP="$IFS"; IFS=":"; local devs=($__DEV_DEVS); IFS=$IFS_BACKUP
+	local root="$(readlink -f "${1:-${devs[0]}}")"
+	if ! __dev_isInStack "$root" __DEV_DEVS ; then
 		echo "$(tput bold)$root$(tput sgr0) $(tput setaf 3)already off dev$(tput sgr0)"
 		return 1
 	fi
-	popfromPATH $root/bin
-	popfromPYTHONPATH $root
+	popfromPATH "$root/bin"
+	popfromPYTHONPATH "$root"
+	__dev_removeFromStack "$root" __DEV_DEVS
 }
+
+if hash complete &>/dev/null; then
+	__dev_undevComplete() {
+		local cur=${COMP_WORDS[COMP_CWORD]}
+		local prev=${COMP_WORDS[COMP_CWORD-1]}
+
+		if [ $COMP_CWORD -eq 1 ]; then
+			local IFS_BACKUP="$IFS"
+			IFS=":"; local devs=($__DEV_DEVS); IFS=$IFS_BACKUP
+			COMPREPLY=( $(compgen -W "${devs[*]}" -- $cur) )
+		fi
+	}
+	complete -o nospace -F __dev_undevComplete undev
+fi
 
 # Prints the values of PATH and PYTHONPATH, as well as all tracked stacks
 dev-status() {
@@ -100,7 +124,7 @@ pushonPYTHONPATH() { pushon PYTHONPATH "$1"; }
 
 # Removes from the stack named $1 and its tracker, $2 or the first tracker path
 #
-# By default, will behave like a pop for the stack named $1 and its tracker, 
+# By default, will behave like a pop for the stack named $1 and its tracker,
 # but if given a path as $2, will remove it from the stack named $1 and its
 # tracker, even if not at the top of the stack.
 #
@@ -188,7 +212,7 @@ __dev_inPYTHONPATH() { __dev_isInStack "$1" PYTHONPATH; }
 #
 # This means that the environment variable named $2 is modified in the calling
 # shell. If the variable named $2 didn't exist or was empty, a variable named
-# $2 is exported and set to $1; if $2 was already a non-empty stack, it's 
+# $2 is exported and set to $1; if $2 was already a non-empty stack, it's
 # prepended with $1, separated with a colon from the previous stack.
 #
 # e.g. __dev_prependToStack ~/code/dev/bin PYTHONPATH
@@ -227,7 +251,7 @@ __dev_stackDepth() {
 # Removes the first instance of $1 in the stack named $2
 #
 # If no element of the stack named $2 is equal to $1, returns error-code 1.
-# Beware, contrary to __dev_isInStack and pushon, this function works on 
+# Beware, contrary to __dev_isInStack and pushon, this function works on
 # literal paths and does not try to compare canonicalized paths.
 #
 # e.g. __dev_removeFromStack /home/user/code/dev PATH
