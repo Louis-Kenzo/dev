@@ -168,7 +168,8 @@ if hash complete &>/dev/null; then
 		local prev=${COMP_WORDS[COMP_CWORD-1]}
 
 		if [ $COMP_CWORD -eq 1 ]; then
-			COMPREPLY=( $(compgen -W "$__DEV_STACKS" -- $cur) )
+			local IFS_BACKUP="$IFS"; IFS=":"; local elements=($__DEV_STACKS); IFS=$IFS_BACKUP
+			COMPREPLY=( $(compgen -W "${elements[@]}" -- $cur) )
 		elif __dev_isInStack $prev __DEV_STACKS; then
 			eval local stack=\$$(__dev_stackName $prev)
 			local IFS_BACKUP="$IFS"
