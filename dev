@@ -87,18 +87,19 @@ dev-status() {
 #
 # e.g. pushon PATH ~/code/project
 pushon() {
+	local root="$(readlink -f $2)"
 	local stack="$1"
 
 	# Return an error, warn the user if the path is already is in the stack
-	if __dev_isInStack "$2" $(__dev_stackName $stack); then 
-		echo "$(tput bold)$2$(tput sgr0) $(tput setaf 1)is already in$(tput sgr0) $(tput bold)$stack$(tput sgr0)"
+	if __dev_isInStack "$root" $(__dev_stackName $stack); then
+		echo "$(tput bold)$root$(tput sgr0) $(tput setaf 1)is already in$(tput sgr0) $(tput bold)$stack$(tput sgr0)"
 		return 1
 	fi
 
-	# Add $2 to the stack, track it by adding it also to the stack tracker
+	# Add $root to the stack, track it by adding it also to the stack tracker
 	# and add the stack tracker to __DEV_STACKS if it's not already there
-	__dev_prependToStack $(readlink -f "$2") "$stack"
-	__dev_prependToStack $(readlink -f "$2") $(__dev_stackName "$stack")
+	__dev_prependToStack $(readlink -f "$root") "$stack"
+	__dev_prependToStack $(readlink -f "$root") $(__dev_stackName "$stack")
 	if ! __dev_isInStack "$stack" __DEV_STACKS; then __dev_prependToStack "$stack" __DEV_STACKS; fi
 
 	echo "Pushed $(tput bold)$(echo $root | sed "s|$HOME|~|")$(tput sgr0) on $(tput bold)$1$(tput sgr0)"
@@ -132,13 +133,12 @@ pushonPYTHONPATH() { pushon PYTHONPATH "$1"; }
 # If the stack is empty, returns 2.
 # If the stack doesn't contain $1, returns 1.
 #
-# e.g. popfrom ~/code/project PATH
+# e.g. popfrom PATH ~/code/project
 popfrom() {
 	# Parse the stack
 	eval local stack=\$$(__dev_stackName $1)
-	local IFS_BACKUP="$IFS"
-	IFS=":"; local elements=($stack); IFS=$IFS_BACKUP
-	
+	local IFS_BACKUP="$IFS"; IFS=":"; local elements=($stack); IFS=$IFS_BACKUP
+
 	if [ "${#elements[@]}" -le 0 ]; then
 		echo "$(tput setaf 3)Empty stack for $(tput bold)$1$(tput sgr0)"
 		return 2
@@ -146,11 +146,11 @@ popfrom() {
 		# Remove $1 from the stack, update the stack tracker by
 		# removing it from there too, and $1 was the last path in the
 		# stack tracker, remove the stack tracker from __DEV_STACKS
-		local element_to_pop="${2:-${elements[0]}}"
+		local element_to_pop="$(readlink -f ${2:-${elements[0]}})"
 
-		if ! __dev_isInStack "$element_to_pop" $(__dev_stackName $1); then 
+		if ! __dev_isInStack "$element_to_pop" $(__dev_stackName $1); then
 			echo "$(tput bold)$element_to_pop$(tput sgr0) $(tput setaf 1)is not in$(tput sgr0) $(tput bold)$1$(tput sgr0)"
-			return 1	
+			return 1
 		fi
 
 		__dev_removeFromStack "$element_to_pop" $1
