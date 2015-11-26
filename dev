@@ -74,8 +74,8 @@ fi
 
 # Prints the values of PATH and PYTHONPATH, as well as all tracked stacks
 dev-status() {
+	__dev_devsStatus
 	__dev_stacksStatus
-	__dev_pathsStatus
 }
 
 # Prepends $2 to the stack named $1 and its tracker stack
@@ -100,8 +100,8 @@ pushon() {
 	__dev_prependToStack $(readlink -f "$2") "$stack"
 	__dev_prependToStack $(readlink -f "$2") $(__dev_stackName "$stack")
 	if ! __dev_isInStack "$stack" __DEV_STACKS; then __dev_prependToStack "$stack" __DEV_STACKS; fi
-	
-	echo "Pushed $(tput bold)$2$(tput sgr0) on $(tput bold)$1$(tput sgr0)"
+
+	echo "Pushed $(tput bold)$(echo $root | sed "s|$HOME|~|")$(tput sgr0) on $(tput bold)$1$(tput sgr0)"
 	return 0
 }
 
@@ -156,8 +156,8 @@ popfrom() {
 		__dev_removeFromStack "$element_to_pop" $1
 		__dev_removeFromStack "$element_to_pop" $(__dev_stackName $1)
 		if [ $(__dev_stackDepth $(__dev_stackName $1)) -le 0 ]; then __dev_removeFromStack $1 __DEV_STACKS; fi
-		
-		echo "Removed $(tput bold)$element_to_pop$(tput sgr0) from $(tput bold)$1$(tput sgr0)"
+
+		echo "Removed $(tput bold)$(echo $element_to_pop | sed "s|$HOME|~|")$(tput sgr0) from $(tput bold)$1$(tput sgr0)"
 		return 0
 	fi
 }
@@ -294,6 +294,16 @@ __dev_stackName() {
 
 # Tools
 
+__dev_variable_status() {
+	echo -n "$(tput bold; tput setaf 4)$1: $(tput sgr0)"
+	eval variable_defined=\${$1+undefined}
+	if [ -z $variable_defined ]; then
+		echo "$(tput setaf 1)undefined$(tput sgr0)"
+	else
+		eval echo \$$1
+	fi
+}
+
 __dev_symbol_status() {
 	echo -n "$(tput bold; tput setaf 4)$1: $(tput sgr0)"
 	if type $1 &>/dev/null; then
@@ -303,7 +313,8 @@ __dev_symbol_status() {
 	fi
 }
 
-dev_functions="__dev_isInStack __dev_inPATH __dev_inPYTHONPATH __dev_prependToStack __dev_postpendToStack __dev_prependPATH __dev_prependPYTHONPATH __dev_stackDepth __dev_removeFromStack __dev_removeFromPATH __dev_removeFromPYTHONPATH __dev_stackName pushon pushonPATH pushonPYTHONPATH popfrom popfromPATH popfromPYTHONPATH __dev_symbol_status __dev_pathsStatus __dev_stacksStatus __dev_status __dev_cleanup dev-status dev undev"
+dev_functions="__dev_isInStack __dev_inPATH __dev_inPYTHONPATH __dev_prependToStack __dev_postpendToStack __dev_prependPATH __dev_prependPYTHONPATH __dev_stackDepth __dev_removeFromStack __dev_removeFromPATH __dev_removeFromPYTHONPATH __dev_stackName pushon pushonPATH pushonPYTHONPATH popfrom popfromPATH popfromPYTHONPATH __dev_variable_status __dev_symbol_status __dev_pathsStatus __dev_devsStatus __dev_stacksStatus __dev_status __dev_cleanup dev-status dev undev"
+dev_variables="__DEV_STACKS __DEV_DEVS"
 
 __dev_pathsStatus() {
 	echo "$(tput bold)$(tput setaf 6)Paths$(tput sgr0)"
@@ -319,10 +330,22 @@ __dev_pathsStatus() {
 	fi
 }
 
+__dev_devsStatus() {
+	echo -e "$(tput bold)$(tput setaf 6)Devs$(tput sgr0)"
+	if [ -z $__DEV_DEVS ]; then
+		echo -e "\t$(tput setaf 1)No devs$(tput sgr0)"
+	else
+		IFS_BACKUP="$IFS";IFS=":"; devs=($__DEV_DEVS); IFS=$IFS_BACKUP
+		for d in "${devs[@]}"; do
+			echo -e "$(tput bold)$(tput setaf 2)\t$(echo $d | sed "s|$HOME|~|")$(tput sgr0)"
+		done
+	fi
+}
+
 __dev_stacksStatus() {
 	echo -e "$(tput bold)$(tput setaf 6)Tracked stacks$(tput sgr0)"
 	if [ -z $__DEV_STACKS ]; then
-		echo -e "\t$(tput setaf 1)No dev stack$(tput sgr0)"
+		echo -e "\t$(tput setaf 1)No stack$(tput sgr0)"
 	else
 		# Parse the stack
 		local IFS_BACKUP="$IFS";IFS=":"; local stacks=($__DEV_STACKS); IFS=$IFS_BACKUP
@@ -341,31 +364,42 @@ __dev_stacksStatus() {
 			done
 			if [ "${#stack_elements[@]}" -le 1 ]; then echo; fi
 		done
+
+		__dev_pathsStatus
 	fi
 }
 
 __dev_metaStatus() {
-	echo "$(tput bold)$(tput setaf 6)Functions & variables$(tput sgr0)"
+	echo "$(tput bold)$(tput setaf 6)Functions$(tput sgr0)"
 	for f in $dev_functions; do
 		echo -e "\t$(__dev_symbol_status $f)"
+	done
+
+	echo "$(tput bold)$(tput setaf 6)Meta-variables$(tput sgr0)"
+	for e in $dev_variables; do
+		echo -e "\t$(__dev_variable_status $e)"
 	done
 }
 
 __dev_status() {
-	__dev_stacksStatus
-	__dev_pathsStatus
 	__dev_metaStatus
 }
 
 __dev_cleanup() {
+	# Cleanup functions
 	for f in $dev_functions; do
 		unset $f
 	done
 
+	# Cleanup stacks
 	# Parse the stack
 	local IFS_BACKUP="$IFS";IFS=":"; local stacks=($__DEV_STACKS); IFS=$IFS_BACKUP
 	for s in "${stacks[@]}"; do
 		unset $s
 	done
-	unset __DEV_STACKS
+
+	# Cleanup meta-variables
+	for e in $dev_variables; do
+		unset $e
+	done
 }
