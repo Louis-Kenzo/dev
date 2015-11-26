@@ -314,7 +314,7 @@ __dev_symbol_status() {
 	fi
 }
 
-dev_functions="__dev_isInStack __dev_inPATH __dev_inPYTHONPATH __dev_prependToStack __dev_postpendToStack __dev_prependPATH __dev_prependPYTHONPATH __dev_stackDepth __dev_removeFromStack __dev_removeFromPATH __dev_removeFromPYTHONPATH __dev_stackName pushon pushonPATH pushonPYTHONPATH popfrom popfromPATH popfromPYTHONPATH __dev_variable_status __dev_symbol_status __dev_pathsStatus __dev_devsStatus __dev_stacksStatus __dev_status __dev_cleanup dev-status dev undev"
+dev_functions="dev undev __dev_undevComplete dev-status pushon __dev_pushOnComplete pushonPATH pushonPYTHONPATH popfrom __dev_popFromComplete popfromPATH popfromPYTHONPATH __dev_isInStack __dev_inPATH __dev_inPYTHONPATH __dev_prependToStack __dev_postpendToStack __dev_prependPATH __dev_prependPYTHONPATH __dev_stackDepth __dev_removeFromStack __dev_removeFromPATH __dev_removeFromPYTHONPATH __dev_stackName __dev_variable_status __dev_symbol_status __dev_pathsStatus __dev_devsStatus __dev_stacksStatus __dev_metaStatus __dev_status __dev_cleanup"
 dev_variables="__DEV_STACKS __DEV_DEVS"
 
 __dev_pathsStatus() {
@@ -389,7 +389,7 @@ __dev_status() {
 __dev_cleanup() {
 	# Cleanup functions
 	for f in $dev_functions; do
-		unset $f
+		unset -f $f
 	done
 
 	# Cleanup stacks
