@@ -27,7 +27,7 @@
 #
 # Returns error-code 1 if both paths are already on their respective stacks.
 dev() {
-	local root="$(readlink -f "${1:-.}")"
+	local root="$(readlink -m "${1:-.}")"
 	if __dev_isInStack "$root" __DEV_DEVS; then
 		echo "$(tput bold)$root$(tput sgr0) $(tput setaf 3)already in dev$(tput sgr0)"
 		return 1
@@ -48,7 +48,7 @@ undev() {
 	fi
 
 	local IFS_BACKUP="$IFS"; IFS=":"; local devs=($__DEV_DEVS); IFS=$IFS_BACKUP
-	local root="$(readlink -f "${1:-${devs[0]}}")"
+	local root="$(readlink -m "${1:-${devs[0]}}")"
 	if ! __dev_isInStack "$root" __DEV_DEVS ; then
 		echo "$(tput bold)$root$(tput sgr0) $(tput setaf 3)already off dev$(tput sgr0)"
 		return 1
@@ -87,7 +87,7 @@ dev-status() {
 #
 # e.g. pushon PATH ~/code/project
 pushon() {
-	local root="$(readlink -f $2)"
+	local root="$(readlink -m $2)"
 	local stack="$1"
 
 	# Return an error, warn the user if the path is already is in the stack
@@ -98,8 +98,8 @@ pushon() {
 
 	# Add $root to the stack, track it by adding it also to the stack tracker
 	# and add the stack tracker to __DEV_STACKS if it's not already there
-	__dev_prependToStack $(readlink -f "$root") "$stack"
-	__dev_prependToStack $(readlink -f "$root") $(__dev_stackName "$stack")
+	__dev_prependToStack $(readlink -m "$root") "$stack"
+	__dev_prependToStack $(readlink -m "$root") $(__dev_stackName "$stack")
 	if ! __dev_isInStack "$stack" __DEV_STACKS; then __dev_prependToStack "$stack" __DEV_STACKS; fi
 
 	echo "Pushed $(tput bold)$(echo $root | sed "s|$HOME|~|")$(tput sgr0) on $(tput bold)$1$(tput sgr0)"
@@ -146,7 +146,7 @@ popfrom() {
 		# Remove $1 from the stack, update the stack tracker by
 		# removing it from there too, and $1 was the last path in the
 		# stack tracker, remove the stack tracker from __DEV_STACKS
-		local element_to_pop="$(readlink -f ${2:-${elements[0]}})"
+		local element_to_pop="$(readlink -m ${2:-${elements[0]}})"
 
 		if ! __dev_isInStack "$element_to_pop" $(__dev_stackName $1); then
 			echo "$(tput bold)$element_to_pop$(tput sgr0) $(tput setaf 1)is not in$(tput sgr0) $(tput bold)$1$(tput sgr0)"
@@ -185,7 +185,7 @@ popfromPYTHONPATH() { popfrom PYTHONPATH "$1"; }
 
 # Checks that $1 is a path canonically-equivalent to one in the stack named $2
 #
-# Canonical-equivalence is the equality of paths resolved using readlink -f.
+# Canonical-equivalence is the equality of paths resolved using readlink -m.
 #
 # Returns the result as a return code:
 # - 0: $1 canonically-equivalent to one of the paths in the stack named #2
@@ -201,7 +201,7 @@ __dev_isInStack() {
 	IFS=":"; local elements=($stack); IFS=$IFS_BACKUP
 	for x in "${elements[@]}"; do
 		if [ -z "$x" ]; then continue; fi
-		if [ "$(readlink -fm $x)" == "$(readlink -f $1)" ]; then return 0; fi
+		if [ "$(readlink -mm $x)" == "$(readlink -m $1)" ]; then return 0; fi
 	done
 	return 1
 }
