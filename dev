@@ -267,6 +267,58 @@ __dev_stackName() {
 	echo __DEV_$1_STACK
 }
 
+
+#──────────────────────────────────────────────────────────────────────────────#
+#                            Super-stack management                            #
+#──────────────────────────────────────────────────────────────────────────────#
+
+__dev_isSuperStack() {
+	# Check that there is a newline in the variable
+	eval local stack=\$$1
+	if [ -z "$stack" ]; then
+		return 2
+	elif [ $(echo "$stack" | wc -l) -gt 1 ] ; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+__dev_superStackDepth() {
+	eval local stack=\$$1
+	if [ -z "$stack" ]; then
+		echo 0
+	else
+		echo "$stack" | wc -l
+	fi
+}
+
+__dev_pushonSuperStack() {
+	eval local stack=\$$1
+	if [ -z "$stack" ]; then
+		export $1="$2"
+	else
+		eval "export $1=\"$2"$'\n'"\$$1\""
+	fi
+}
+
+__dev_popfromSuperStack() {
+	eval local stack=\$$1
+	if [ -z "$stack" ]; then
+		return 2
+	else
+		IFS_BACKUP="$IFS";IFS=$'\n'; local stacks_components=($stack); IFS=$IFS_BACKUP
+		IFS_BACKUP="$IFS";IFS=$'\n'; local new_stack="${stacks_components[*]:1}"; IFS=$IFS_BACKUP
+		echo "${stacks_components[0]}"
+		if [ ${#stacks_components[@]} -eq 1 ]; then
+			unset $1
+		else
+			eval "export $1=\"$new_stack\""
+		fi
+		return 0
+	fi
+}
+
 #──────────────────────────────────────────────────────────────────────────────#
 #                                    Tools                                     #
 #──────────────────────────────────────────────────────────────────────────────#
