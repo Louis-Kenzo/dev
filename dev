@@ -204,9 +204,6 @@ __dev_isInStack() {
 	return 1
 }
 
-__dev_inPATH() { __dev_isInStack "$1" PATH; }
-__dev_inPYTHONPATH() { __dev_isInStack "$1" PYTHONPATH; }
-
 # Prepends $1 to the stack named $2
 #
 # This means that the environment variable named $2 is modified in the calling
@@ -232,9 +229,6 @@ __dev_postpendToStack() {
 		eval "export $2=\"\$$2:$1\""
 	fi
 }
-
-__dev_prependPATH() { __dev_prependToStack "$1" PATH; }
-__dev_prependPYTHONPATH() { __dev_prependToStack "$1" PYTHONPATH; }
 
 # Returns the number of elements in the stack named $1
 #
@@ -283,9 +277,6 @@ __dev_removeFromStack() {
 	fi
 }
 
-__dev_removeFromPATH() { __dev_removeFromStack "$1" PATH; }
-__dev_removeFromPYTHONPATH() { __dev_removeFromStack "$1" PYTHONPATH; }
-
 # Returns the name of the env variable tracking paths added to the stack named $1
 __dev_stackName() {
 	echo __DEV_$1_STACK
@@ -314,7 +305,7 @@ __dev_symbol_status() {
 	fi
 }
 
-dev_functions="dev undev __dev_undevComplete dev-status pushon __dev_pushOnComplete pushonPATH pushonPYTHONPATH popfrom __dev_popFromComplete popfromPATH popfromPYTHONPATH __dev_isInStack __dev_inPATH __dev_inPYTHONPATH __dev_prependToStack __dev_postpendToStack __dev_prependPATH __dev_prependPYTHONPATH __dev_stackDepth __dev_removeFromStack __dev_removeFromPATH __dev_removeFromPYTHONPATH __dev_stackName __dev_variable_status __dev_symbol_status __dev_pathsStatus __dev_devsStatus __dev_stacksStatus __dev_metaStatus __dev_status __dev_cleanup"
+dev_functions="dev undev __dev_undevComplete dev-status pushon __dev_pushOnComplete pushonPATH pushonPYTHONPATH popfrom __dev_popFromComplete popfromPATH popfromPYTHONPATH __dev_isInStack __dev_prependToStack __dev_postpendToStack __dev_stackDepth __dev_removeFromStack __dev_stackName __dev_variable_status __dev_symbol_status __dev_pathsStatus __dev_devsStatus __dev_stacksStatus __dev_metaStatus __dev_status __dev_cleanup"
 dev_variables="__DEV_STACKS __DEV_DEVS"
 
 __dev_pathsStatus() {
