@@ -22,6 +22,10 @@
 # and the content of $stack, which is intuitively $$stack, and is in practice
 # indirected using the idiom eval stack_content=\$$stack.
 
+#──────────────────────────────────────────────────────────────────────────────#
+#                                 Dev interface                                #
+#──────────────────────────────────────────────────────────────────────────────#
+
 # Pushes $1/bin and $1 (or by default ./bin and .) on PATH and PYTHONPATH
 # respectively
 #
@@ -58,25 +62,15 @@ undev() {
 	__dev_removeFromStack "$root" __DEV_DEVS
 }
 
-if hash complete &>/dev/null; then
-	__dev_undevComplete() {
-		local cur=${COMP_WORDS[COMP_CWORD]}
-		local prev=${COMP_WORDS[COMP_CWORD-1]}
-
-		if [ $COMP_CWORD -eq 1 ]; then
-			local IFS_BACKUP="$IFS"
-			IFS=":"; local devs=($__DEV_DEVS); IFS=$IFS_BACKUP
-			COMPREPLY=( $(compgen -W "${devs[*]}" -- $cur) )
-		fi
-	}
-	complete -o nospace -F __dev_undevComplete undev
-fi
-
 # Prints the values of PATH and PYTHONPATH, as well as all tracked stacks
 dev-status() {
 	__dev_devsStatus
 	__dev_stacksStatus
 }
+
+#──────────────────────────────────────────────────────────────────────────────#
+#                                Stack interface                               #
+#──────────────────────────────────────────────────────────────────────────────#
 
 # Prepends $2 to the stack named $1 and its tracker stack
 #
@@ -182,6 +176,10 @@ fi
 
 popfromPATH(){ popfrom PATH "$1"; }
 popfromPYTHONPATH() { popfrom PYTHONPATH "$1"; }
+
+#──────────────────────────────────────────────────────────────────────────────#
+#                               Stack management                               #
+#──────────────────────────────────────────────────────────────────────────────#
 
 # Checks that $1 is a path canonically-equivalent to one in the stack named $2
 #
@@ -293,7 +291,9 @@ __dev_stackName() {
 	echo __DEV_$1_STACK
 }
 
-# Tools
+#──────────────────────────────────────────────────────────────────────────────#
+#                                    Tools                                     #
+#──────────────────────────────────────────────────────────────────────────────#
 
 __dev_variable_status() {
 	echo -n "$(tput bold; tput setaf 4)$1: $(tput sgr0)"
@@ -404,3 +404,21 @@ __dev_cleanup() {
 		unset $e
 	done
 }
+
+#──────────────────────────────────────────────────────────────────────────────#
+#                                  Completion                                  #
+#──────────────────────────────────────────────────────────────────────────────#
+
+if hash complete &>/dev/null; then
+	__dev_undevComplete() {
+		local cur=${COMP_WORDS[COMP_CWORD]}
+		local prev=${COMP_WORDS[COMP_CWORD-1]}
+
+		if [ $COMP_CWORD -eq 1 ]; then
+			local IFS_BACKUP="$IFS"
+			IFS=":"; local devs=($__DEV_DEVS); IFS=$IFS_BACKUP
+			COMPREPLY=( $(compgen -W "${devs[*]}" -- $cur) )
+		fi
+	}
+	complete -o nospace -F __dev_undevComplete undev
+fi
