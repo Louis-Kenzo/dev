@@ -395,8 +395,24 @@ __dev_cleanup() {
 #                                  Completion                                  #
 #──────────────────────────────────────────────────────────────────────────────#
 
-# undev completion
+# dev completion
+if hash complete &>/dev/null; then
+	__dev_devComplete() {
+		local cur=${COMP_WORDS[COMP_CWORD]}
+		local prev=${COMP_WORDS[COMP_CWORD-1]}
 
+		if [ $COMP_CWORD -eq 1 ]; then
+			if [ "$(basename $cur 2>/dev/null)" = '.' ]; then
+				COMPREPLY=( $(compgen -d -S/ $cur) )
+			else
+				COMPREPLY=( $(compgen -d -S/ $cur -X '.*' |  grep -v '/\.[^/]*/$') )
+			fi
+		fi
+	}
+	complete -o nospace -F __dev_devComplete dev
+fi
+
+# undev completion
 if hash complete &>/dev/null; then
 	__dev_undevComplete() {
 		local cur=${COMP_WORDS[COMP_CWORD]}
@@ -414,13 +430,18 @@ fi
 # pushon completion
 if hash complete &>/dev/null; then
 	__dev_pushOnComplete() {
+		local always_propose="PATH LD_LIBRARY_PATH PYTHONPATH"
 		local cur=${COMP_WORDS[COMP_CWORD]}
 		local prev=${COMP_WORDS[COMP_CWORD-1]}
 
 		if [ $COMP_CWORD -eq 1 ]; then
-			COMPREPLY=( $(compgen -W "$(env | cut -d= -f1 | grep -E *PATH)" -- $cur) )
+			COMPREPLY=( $(compgen -W "$(env | cut -d= -f1 | grep -E *PATH) $always_propose" -- $cur) )
 		elif [ $COMP_CWORD -eq 2 ]; then
-			COMPREPLY=( $(compgen -o dirnames $cur -- .) )
+			if [ "$(basename $cur 2>/dev/null)" = '.' ]; then
+				COMPREPLY=( $(compgen -d -S/ $cur) )
+			else
+				COMPREPLY=( $(compgen -d -S/ $cur -X '.*' |  grep -v '/\.[^/]*/$') )
+			fi
 		fi
 	}
 	complete -o nospace -F __dev_pushOnComplete pushon
