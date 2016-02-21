@@ -275,7 +275,7 @@ dev_functions="dev undev dev-status"\
 " __dev_devsStatus __dev_stacksStatus __dev_pathsStatus"\
 " __dev_variable_status __dev_symbol_status __dev_metaStatus __dev_status"\
 " __dev_cleanup"\
-" __dev_undevComplete __dev_pushOnComplete __dev_popFromComplete"
+" __dev_undevComplete __dev_pushonComplete __dev_popfromComplete"
 dev_variables="__DEV_STACKS __DEV_DEVS"
 
 # ────────────────────────── Public status helpers ─────────────────────────── #
@@ -429,7 +429,7 @@ fi
 
 # pushon completion
 if hash complete &>/dev/null; then
-	__dev_pushOnComplete() {
+	__dev_pushonComplete() {
 		local always_propose="PATH LD_LIBRARY_PATH PYTHONPATH"
 		local cur=${COMP_WORDS[COMP_CWORD]}
 		local prev=${COMP_WORDS[COMP_CWORD-1]}
@@ -444,12 +444,12 @@ if hash complete &>/dev/null; then
 			fi
 		fi
 	}
-	complete -o nospace -F __dev_pushOnComplete pushon
+	complete -o nospace -F __dev_pushonComplete pushon
 fi
 
 # popfrom completion
 if hash complete &>/dev/null; then
-	__dev_popFromComplete() {
+	__dev_popfromComplete() {
 		local cur=${COMP_WORDS[COMP_CWORD]}
 		local prev=${COMP_WORDS[COMP_CWORD-1]}
 
@@ -463,5 +463,5 @@ if hash complete &>/dev/null; then
 			COMPREPLY=( $(compgen -W "${elements[@]}" -- $cur) )
 		fi
 	}
-	complete -F __dev_popFromComplete popfrom
+	complete -F __dev_popfromComplete popfrom
 fi
