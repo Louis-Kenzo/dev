@@ -26,10 +26,11 @@
 #                                 Dev interface                                #
 #──────────────────────────────────────────────────────────────────────────────#
 
-# Pushes $1/bin and $1 (or by default ./bin and .) on PATH and PYTHONPATH
-# respectively
-#
-# Returns error-code 1 if both paths are already on their respective stacks.
+## Pushes $1/bin and $1 (or by default ./bin and .) on PATH and PYTHONPATH
+## respectively.
+##
+## Returns error-code 1 if both paths are already on their respective stacks.
+
 dev() {
 	local root="$(readlink -m "${1:-.}")"
 	if __dev_isInStack "$root" __DEV_DEVS; then
@@ -41,10 +42,11 @@ dev() {
 	pushonPYTHONPATH "$root"
 }
 
-# Pops $1/bin and $1 (or by default ./bin and .) from PATH and PYTHONPATH
-# respectively
-#
-# Returns error-code 1 if both paths are already off their respective stacks.
+## Pops $1/bin and $1 (or by default ./bin and .) from PATH and PYTHONPATH
+## respectively.
+##
+## Returns error-code 1 if both paths are already off their respective stacks.
+
 undev() {
 	if [ $# -eq 0 ] && [ $(__dev_stackDepth __DEV_DEVS) -le 0 ]; then
 		echo "$(tput bold)$(tput setaf 1)No dev to undev$(tput sgr0)"
@@ -62,7 +64,8 @@ undev() {
 	__dev_removeFromStack "$root" __DEV_DEVS
 }
 
-# Prints the values of PATH and PYTHONPATH, as well as all tracked stacks
+## Prints the values of PATH and PYTHONPATH, as well as all tracked stacks.
+
 dev-status() {
 	__dev_devsStatus
 	__dev_stacksStatus
@@ -72,14 +75,15 @@ dev-status() {
 #                                Stack interface                               #
 #──────────────────────────────────────────────────────────────────────────────#
 
-# Prepends $2 to the stack named $1 and its tracker stack
-#
-# If the tracker stack didn't exist yet, it's added to the environment variable
-# __DEV_STACKS after being created.
-#
-# If $2 is already in the tracker, the error-code 1 is returned.
-#
-# e.g. pushon PATH ~/code/project
+## Prepends $2 to the stack named $1 and its tracker stack.
+##
+## If the tracker stack didn't exist yet, it's added to the environment variable
+## __DEV_STACKS after being created.
+##
+## If $2 is already in the tracker, the error-code 1 is returned.
+##
+## e.g. pushon PATH ~/code/project
+
 pushon() {
 	local root="$(readlink -m $2)"
 	local stack="$1"
@@ -100,34 +104,22 @@ pushon() {
 	return 0
 }
 
-if hash complete &>/dev/null; then
-	__dev_pushOnComplete() {
-		local cur=${COMP_WORDS[COMP_CWORD]}
-		local prev=${COMP_WORDS[COMP_CWORD-1]}
-
-		if [ $COMP_CWORD -eq 1 ]; then
-			COMPREPLY=( $(compgen -W "$(env | cut -d= -f1 | grep -E *PATH)" -- $cur) )
-		elif [ $COMP_CWORD -eq 2 ]; then
-			COMPREPLY=( $(compgen -o dirnames $cur -- .) )
-		fi
-	}
-	complete -o nospace -F __dev_pushOnComplete pushon
-fi
-
 pushonPATH() { pushon PATH "$1"; }
 pushonPYTHONPATH() { pushon PYTHONPATH "$1"; }
 
-# Removes from the stack named $1 and its tracker, $2 or the first tracker path
-#
-# By default, will behave like a pop for the stack named $1 and its tracker,
-# but if given a path as $2, will remove it from the stack named $1 and its
-# tracker, even if not at the top of the stack.
-#
-# If the tracker becomes empty, it is removed from __DEV_STACKS.
-# If the stack is empty, returns 2.
-# If the stack doesn't contain $1, returns 1.
-#
-# e.g. popfrom PATH ~/code/project
+## Removes from the stack named $1 and its tracker, $2 or the first tracker
+## path.
+##
+## By default, will behave like a pop for the stack named $1 and its tracker,
+## but if given a path as $2, will remove it from the stack named $1 and its
+## tracker, even if not at the top of the stack.
+##
+## If the tracker becomes empty, it is removed from __DEV_STACKS.
+## If the stack is empty, returns 2.
+## If the stack doesn't contain $1, returns 1.
+##
+## e.g. popfrom PATH ~/code/project
+
 popfrom() {
 	# Parse the stack
 	eval local stack=\$$(__dev_stackName $1)
@@ -156,24 +148,6 @@ popfrom() {
 	fi
 }
 
-if hash complete &>/dev/null; then
-	__dev_popFromComplete() {
-		local cur=${COMP_WORDS[COMP_CWORD]}
-		local prev=${COMP_WORDS[COMP_CWORD-1]}
-
-		if [ $COMP_CWORD -eq 1 ]; then
-			local IFS_BACKUP="$IFS"; IFS=":"; local elements=($__DEV_STACKS); IFS=$IFS_BACKUP
-			COMPREPLY=( $(compgen -W "${elements[@]}" -- $cur) )
-		elif __dev_isInStack $prev __DEV_STACKS; then
-			eval local stack=\$$(__dev_stackName $prev)
-			local IFS_BACKUP="$IFS"
-			IFS=":"; local elements=($stack); IFS=$IFS_BACKUP
-			COMPREPLY=( $(compgen -W "${elements[@]}" -- $cur) )
-		fi
-	}
-	complete -F __dev_popFromComplete popfrom
-fi
-
 popfromPATH(){ popfrom PATH "$1"; }
 popfromPYTHONPATH() { popfrom PYTHONPATH "$1"; }
 
@@ -181,17 +155,18 @@ popfromPYTHONPATH() { popfrom PYTHONPATH "$1"; }
 #                               Stack management                               #
 #──────────────────────────────────────────────────────────────────────────────#
 
-# Checks that $1 is a path canonically-equivalent to one in the stack named $2
-#
-# Canonical-equivalence is the equality of paths resolved using readlink -m.
-#
-# Returns the result as a return code:
-# - 0: $1 canonically-equivalent to one of the paths in the stack named #2
-# - 1: $1 is not canonically-equivalent to any of the paths in the stack named
-#      $2
-# - 2: $1 is empty
-#
-# e.g. __dev_isInStack ~/code/dev PATH
+## Checks that $1 is a path canonically-equivalent to one in the stack named $2.
+##
+## Canonical-equivalence is the equality of paths resolved using readlink -m.
+##
+## Returns the result as a return code:
+## - 0: $1 canonically-equivalent to one of the paths in the stack named #2
+## - 1: $1 is not canonically-equivalent to any of the paths in the stack named
+##      $2
+## - 2: $1 is empty
+##
+## e.g. __dev_isInStack ~/code/dev PATH
+
 __dev_isInStack() {
 	if [ -z "$1" ]; then return 2; fi
 	eval local stack=\$$2
@@ -204,14 +179,15 @@ __dev_isInStack() {
 	return 1
 }
 
-# Prepends $1 to the stack named $2
-#
-# This means that the environment variable named $2 is modified in the calling
-# shell. If the variable named $2 didn't exist or was empty, a variable named
-# $2 is exported and set to $1; if $2 was already a non-empty stack, it's
-# prepended with $1, separated with a colon from the previous stack.
-#
-# e.g. __dev_prependToStack ~/code/dev/bin PYTHONPATH
+## Prepends $1 to the stack named $2.
+##
+## This means that the environment variable named $2 is modified in the calling
+## shell. If the variable named $2 didn't exist or was empty, a variable named
+## $2 is exported and set to $1; if $2 was already a non-empty stack, it's
+## prepended with $1, separated with a colon from the previous stack.
+##
+## e.g. __dev_prependToStack ~/code/dev/bin PYTHONPATH
+
 __dev_prependToStack() {
 	eval local stack=\$$2
 	if [ -z "$stack" ]; then
@@ -221,7 +197,8 @@ __dev_prependToStack() {
 	fi
 }
 
-# Like __dev_prependToStack but postfixes instead of prefixing
+## Like __dev_prependToStack but postfixes instead of prefixing.
+
 __dev_postpendToStack() {
 	if [ -z "$stack" ]; then
 		export $2="$1"
@@ -230,9 +207,10 @@ __dev_postpendToStack() {
 	fi
 }
 
-# Returns the number of elements in the stack named $1
-#
-# e.g. __dev_stackDepth PATH
+## Returns the number of elements in the stack named $1.
+##
+## e.g. __dev_stackDepth PATH
+
 __dev_stackDepth() {
 	# Parse the stack
 	eval local stack=\$$1
@@ -241,19 +219,21 @@ __dev_stackDepth() {
 	echo "${#elements[@]}"
 }
 
-# Removes the first instance of $1 in the stack named $2
-#
-# If no element of the stack named $2 is equal to $1, returns error-code 1.
-# Beware, contrary to __dev_isInStack and pushon, this function works on
-# literal paths and does not try to compare canonicalized paths.
-#
-# e.g. __dev_removeFromStack /home/user/code/dev PATH
+## Removes the first instance of $1 in the stack named $2.
+##
+## If no element of the stack named $2 is equal to $1, returns error-code 1.
+## Beware, contrary to __dev_isInStack and pushon, this function works on
+## literal paths and does not try to compare canonicalized paths.
+##
+## e.g. __dev_removeFromStack /home/user/code/dev PATH
+
 __dev_removeFromStack() {
 	# Parse the stack
 	eval local stack=\$$2
 	local IFS_BACKUP="$IFS"
 	IFS=":"; local elements=($stack); IFS=$IFS_BACKUP
-	# Build the new stack by iterating copying elements over except for the first occurence of the path we want to remove
+	# Build the new stack by iterating copying elements over except for the first
+	# occurence of the path we want to remove
 	local new_stack=""
 	local removed="" # Empty is false
 	for x in "${elements[@]}"; do
@@ -277,7 +257,9 @@ __dev_removeFromStack() {
 	fi
 }
 
-# Returns the name of the env variable tracking paths added to the stack named $1
+## Returns the name of the env variable tracking paths added to the stack named
+## $1.
+
 __dev_stackName() {
 	echo __DEV_$1_STACK
 }
@@ -286,41 +268,17 @@ __dev_stackName() {
 #                                    Tools                                     #
 #──────────────────────────────────────────────────────────────────────────────#
 
-__dev_variable_status() {
-	echo -n "$(tput bold; tput setaf 4)$1: $(tput sgr0)"
-	eval variable_defined=\${$1+undefined}
-	if [ -z $variable_defined ]; then
-		echo "$(tput setaf 1)undefined$(tput sgr0)"
-	else
-		eval echo \$$1
-	fi
-}
-
-__dev_symbol_status() {
-	echo -n "$(tput bold; tput setaf 4)$1: $(tput sgr0)"
-	if type $1 &>/dev/null; then
-		echo "$(tput setaf 2)$(type -t $1)$(tput sgr0)"
-	else
-		echo "$(tput setaf 1)undefined$(tput sgr0)"
-	fi
-}
-
-dev_functions="dev undev __dev_undevComplete dev-status pushon __dev_pushOnComplete pushonPATH pushonPYTHONPATH popfrom __dev_popFromComplete popfromPATH popfromPYTHONPATH __dev_isInStack __dev_prependToStack __dev_postpendToStack __dev_stackDepth __dev_removeFromStack __dev_stackName __dev_variable_status __dev_symbol_status __dev_pathsStatus __dev_devsStatus __dev_stacksStatus __dev_metaStatus __dev_status __dev_cleanup"
+dev_functions="dev undev dev-status"\
+" pushon pushonPATH pushonPYTHONPATH"\
+" popfrom popfromPATH popfromPYTHONPATH"\
+" __dev_isInStack __dev_prependToStack __dev_postpendToStack __dev_stackDepth __dev_removeFromStack __dev_stackName"\
+" __dev_devsStatus __dev_stacksStatus __dev_pathsStatus"\
+" __dev_variable_status __dev_symbol_status __dev_metaStatus __dev_status"\
+" __dev_cleanup"\
+" __dev_undevComplete __dev_pushOnComplete __dev_popFromComplete"
 dev_variables="__DEV_STACKS __DEV_DEVS"
 
-__dev_pathsStatus() {
-	echo "$(tput bold)$(tput setaf 6)Paths$(tput sgr0)"
-	if [ -z $__DEV_STACKS ]; then
-		echo -e "\t$(tput setaf 1)No dev stack$(tput sgr0)"
-	else
-		# Parse the stack
-		local IFS_BACKUP="$IFS";IFS=":"; local stacks=($__DEV_STACKS); IFS=$IFS_BACKUP
-		for s in "${stacks[@]}"; do
-			eval local stack_string=\$$s
-			echo -e "\t$(tput bold)$(tput setaf 4)$s:$(tput sgr0) ${stack_string:-$(tput setaf 1)undefined$(tput sgr0)}"
-		done
-	fi
-}
+# ────────────────────────── Public status helpers ─────────────────────────── #
 
 __dev_devsStatus() {
 	echo -e "$(tput bold)$(tput setaf 6)Devs$(tput sgr0)"
@@ -361,6 +319,41 @@ __dev_stacksStatus() {
 	fi
 }
 
+__dev_pathsStatus() {
+	echo "$(tput bold)$(tput setaf 6)Paths$(tput sgr0)"
+	if [ -z $__DEV_STACKS ]; then
+		echo -e "\t$(tput setaf 1)No dev stack$(tput sgr0)"
+	else
+		# Parse the stack
+		local IFS_BACKUP="$IFS";IFS=":"; local stacks=($__DEV_STACKS); IFS=$IFS_BACKUP
+		for s in "${stacks[@]}"; do
+			eval local stack_string=\$$s
+			echo -e "\t$(tput bold)$(tput setaf 4)$s:$(tput sgr0) ${stack_string:-$(tput setaf 1)undefined$(tput sgr0)}"
+		done
+	fi
+}
+
+# ──────────────────────────────── Debugging ───────────────────────────────── #
+
+__dev_variable_status() {
+	echo -n "$(tput bold; tput setaf 4)$1: $(tput sgr0)"
+	eval variable_defined=\${$1+undefined}
+	if [ -z $variable_defined ]; then
+		echo "$(tput setaf 1)undefined$(tput sgr0)"
+	else
+		eval echo \$$1
+	fi
+}
+
+__dev_symbol_status() {
+	echo -n "$(tput bold; tput setaf 4)$1: $(tput sgr0)"
+	if type $1 &>/dev/null; then
+		echo "$(tput setaf 2)$(type -t $1)$(tput sgr0)"
+	else
+		echo "$(tput setaf 1)undefined$(tput sgr0)"
+	fi
+}
+
 __dev_metaStatus() {
 	echo "$(tput bold)$(tput setaf 6)Functions$(tput sgr0)"
 	for f in $dev_functions; do
@@ -376,6 +369,8 @@ __dev_metaStatus() {
 __dev_status() {
 	__dev_metaStatus
 }
+
+# ───────────────────────────────── Cleanup ────────────────────────────────── #
 
 __dev_cleanup() {
 	# Cleanup functions
@@ -400,6 +395,8 @@ __dev_cleanup() {
 #                                  Completion                                  #
 #──────────────────────────────────────────────────────────────────────────────#
 
+# undev completion
+
 if hash complete &>/dev/null; then
 	__dev_undevComplete() {
 		local cur=${COMP_WORDS[COMP_CWORD]}
@@ -412,4 +409,38 @@ if hash complete &>/dev/null; then
 		fi
 	}
 	complete -o nospace -F __dev_undevComplete undev
+fi
+
+# pushon completion
+if hash complete &>/dev/null; then
+	__dev_pushOnComplete() {
+		local cur=${COMP_WORDS[COMP_CWORD]}
+		local prev=${COMP_WORDS[COMP_CWORD-1]}
+
+		if [ $COMP_CWORD -eq 1 ]; then
+			COMPREPLY=( $(compgen -W "$(env | cut -d= -f1 | grep -E *PATH)" -- $cur) )
+		elif [ $COMP_CWORD -eq 2 ]; then
+			COMPREPLY=( $(compgen -o dirnames $cur -- .) )
+		fi
+	}
+	complete -o nospace -F __dev_pushOnComplete pushon
+fi
+
+# popfrom completion
+if hash complete &>/dev/null; then
+	__dev_popFromComplete() {
+		local cur=${COMP_WORDS[COMP_CWORD]}
+		local prev=${COMP_WORDS[COMP_CWORD-1]}
+
+		if [ $COMP_CWORD -eq 1 ]; then
+			local IFS_BACKUP="$IFS"; IFS=":"; local elements=($__DEV_STACKS); IFS=$IFS_BACKUP
+			COMPREPLY=( $(compgen -W "${elements[@]}" -- $cur) )
+		elif __dev_isInStack $prev __DEV_STACKS; then
+			eval local stack=\$$(__dev_stackName $prev)
+			local IFS_BACKUP="$IFS"
+			IFS=":"; local elements=($stack); IFS=$IFS_BACKUP
+			COMPREPLY=( $(compgen -W "${elements[@]}" -- $cur) )
+		fi
+	}
+	complete -F __dev_popFromComplete popfrom
 fi
