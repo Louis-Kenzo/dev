@@ -38,9 +38,12 @@ dev() {
 		echo "$(tput bold)$root$(tput sgr0) $(tput setaf 3)already in dev$(tput sgr0)"
 		return 1
 	fi
-	__dev_prependToStack "$root" __DEV_DEVS
-	pushonPATH "$root/bin"
-	pushonPYTHONPATH "$root"
+
+	declare -a NEW_DEV=("$root")
+	NEW_DEV+=(PATH "$root/bin")
+	NEW_DEV+=(PYTHONPATH "$root")
+
+	__dev_pushonDev NEW_DEV[@]
 }
 
 ## Pops $1/bin and $1 (or by default ./bin and .) from PATH and PYTHONPATH
@@ -49,20 +52,22 @@ dev() {
 ## Returns error-code 1 if both paths are already off their respective stacks.
 
 undev() {
-	if [ $# -eq 0 ] && [ $(__dev_stackDepth __DEV_DEVS) -le 0 ]; then
+	if [ $# -eq 0 ] && [ $(__dev_devDepth) -le 0 ]; then
 		echo "$(tput bold)$(tput setaf 1)No dev to undev$(tput sgr0)"
 		return 2
 	fi
 
-	local IFS_BACKUP="$IFS"; IFS=":"; local devs=($__DEV_DEVS); IFS=$IFS_BACKUP
-	local root="$(readlink -m "${1:-${devs[0]}}")"
-	if ! __dev_isInStack "$root" __DEV_DEVS ; then
+	local IFS_BACKUP="$IFS"; IFS=":"
+	local dev_roots=($(__dev_devRoots)); local dev_roots_stack="${dev_roots[*]}"
+	IFS=$IFS_BACKUP
+
+	local root="$(readlink -m "${1:-${dev_roots[0]}}")"
+	if ! __dev_isInStack "$root" dev_roots_stack ; then
 		echo "$(tput bold)$root$(tput sgr0) $(tput setaf 3)already off dev$(tput sgr0)"
 		return 1
 	fi
-	popfromPATH "$root/bin"
-	popfromPYTHONPATH "$root"
-	__dev_removeFromStack "$root" __DEV_DEVS
+
+	__dev_removefromDev "$root"
 }
 
 ## Prints the values of PATH and PYTHONPATH, as well as all tracked stacks.
@@ -177,7 +182,7 @@ __dev_isInStack() {
 	IFS=":"; local elements=($stack); IFS=$IFS_BACKUP
 	for x in "${elements[@]}"; do
 		if [ -z "$x" ]; then continue; fi
-		if [ "$(readlink -mm $x)" == "$(readlink -m $1)" ]; then return 0; fi
+		if [ "$(readlink -m $x)" == "$(readlink -m $1)" ]; then return 0; fi
 	done
 	return 1
 }
@@ -320,6 +325,102 @@ __dev_popfromSuperStack() {
 }
 
 #──────────────────────────────────────────────────────────────────────────────#
+#                                Dev management                                #
+#──────────────────────────────────────────────────────────────────────────────#
+
+__dev_devDepth() {
+	__dev_superStackDepth __DEV_DEVS
+}
+
+## Extracts the root of a dev from its representation.
+__dev_devRoot() {
+	local IFS=":"
+	local segments=($1)
+	echo "${segments[0]}"
+}
+
+## Extracts a stack representaiton of all root devs.
+__dev_devRoots() {
+	declare -a roots=()
+	IFS_BACKUP="$IFS";IFS=$'\n'; local devs=($__DEV_DEVS); IFS=$IFS_BACKUP
+	for dev_component in "${devs[@]}"; do
+		roots+=("$(__dev_devRoot $dev_component)")
+	done
+	IFS_BACKUP="$IFS";IFS=':'; echo "${roots[*]}"; IFS=$IFS_BACKUP
+}
+
+## Extracts the dev pair part in a dev representation.
+__dev_devPairs() {
+	local IFS=":"
+	local segments=($1)
+	echo "${segments[*]:1}"
+}
+
+## Tests if a dev with the given root exists.
+__dev_hasDev() {
+	IFS_BACKUP="$IFS";IFS=$'\n'; local devs=($__DEV_DEVS); IFS=$IFS_BACKUP
+	for dev_component in "${devs[@]}"; do
+		if [ "$(__dev_devRoot $dev_component)" = "$2" ]; then return 0; fi
+	done
+	return 1
+}
+
+__dev_pushonDev() {
+	declare -a DEV_ARRAY=("${!1}")
+	declare -a ADDED_PAIRS=()
+
+	# For each dev pair, add it to its stack
+	local i
+	for i in $(seq 1 2 $(expr ${#DEV_ARRAY[@]} - 1)); do
+		pushon "${DEV_ARRAY[i]}" "${DEV_ARRAY[i+1]}"
+		if [ $? -eq 0 ]; then
+			ADDED_PAIRS+=("${DEV_ARRAY[i]}" "${DEV_ARRAY[i+1]}")
+		fi
+	done
+
+	# Record the dev
+	if [ "${#ADDED_PAIRS[@]}" -ge 1 ]; then
+		local IFS=":"
+		__dev_pushonSuperStack __DEV_DEVS "${DEV_ARRAY[0]}:${ADDED_PAIRS[*]}"
+	fi
+}
+
+__dev_popStacksInDev() {
+	local i
+	IFS_BACKUP="$IFS";IFS=':'; local stack_pairs=($(__dev_devPairs "$1")); IFS=$IFS_BACKUP
+	for i in $(seq 0 2 $(expr ${#stack_pairs[@]} - 2)); do
+		popfrom "${stack_pairs[i]}" "${stack_pairs[i+1]}"
+	done
+}
+
+__dev_popfromDev() {
+	local popped_dev=$(__dev_popfromSuperStack __DEV_DEVS)
+	__dev_popStacksInDev "$popped_dev"
+	__dev_popfromSuperStack __DEV_DEVS &>/dev/null
+}
+
+__dev_removefromDev() {
+	IFS_BACKUP="$IFS";IFS=$'\n'; local devs=($__DEV_DEVS); IFS=$IFS_BACKUP
+	local i
+	for i in $(seq 0 ${#devs[@]}); do
+		if [ "$(__dev_devRoot "${devs[i]}")" = "$1" ]; then
+			__dev_popStacksInDev "${devs[i]}"
+			if [ "$i" -eq 0 ]; then
+				devs=(${devs[@]:1})
+			else
+				devs=(${devs[@]:0:$i} ${devs[@]:$(expr $i + 1)})
+			fi
+			IFS_BACKUP="$IFS";IFS=$'\n'; export __DEV_DEVS="${devs[*]}"; IFS=$IFS_BACKUP
+			break
+		fi
+	done
+}
+
+__dev_devPair() {
+	echo "$1:$2"
+}
+
+#──────────────────────────────────────────────────────────────────────────────#
 #                                    Tools                                     #
 #──────────────────────────────────────────────────────────────────────────────#
 
@@ -340,7 +441,7 @@ __dev_devsStatus() {
 	if [ -z "$__DEV_DEVS" ]; then
 		echo -e "\t$(tput setaf 1)No devs$(tput sgr0)"
 	else
-		IFS_BACKUP="$IFS";IFS=":"; devs=($__DEV_DEVS); IFS=$IFS_BACKUP
+		IFS_BACKUP="$IFS";IFS=":"; devs=($(__dev_devRoots)); IFS=$IFS_BACKUP
 		for d in "${devs[@]}"; do
 			echo -e "$(tput bold)$(tput setaf 2)\t$(echo $d | sed "s|$HOME|~|")$(tput sgr0)"
 		done
