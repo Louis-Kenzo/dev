@@ -4,12 +4,10 @@ The main use is pushing one or several "dev" (a folder containing development ex
 
 ```sh
 > dev
-Pushed ~ on PATH
-Pushed ~/bin on PYTHONPATH
-> # Will use executables, python modules from this folder while you work on your code
+Pushed ~/work/myproject on PATH
+> # Will use executables from this folder while you work on your code
 > undev
-Removed ~ from PATH
-Removed ~/bin from PYTHONPATH
+Removed ~/work/myproject from PATH
 ```
 
 dev tracks which paths have been added to which stack and only removes paths that it has added in order to leave you free to (reasonably) continue modifying your environment variables while you develop. It tries not to interfere with parts of stacks it is not responsible of.
@@ -29,7 +27,9 @@ Installation
 Functions
 ---------
 
-* `dev`: Pushes `$1` on `PATH` and `$1/bin` on `PYTHONPATH`
+* `dev`: Pushes `$1` on `PATH` and `$1/bin` on `PYTHONPATH` if it is a Python package with setup.py; otherwise like devbin
+* `devbin`: Pushes `$1` on `PATH`
+* `devpy`: Pushes `$1` on `PYTHONPATH`
 * `undev`: Pops `$1` from `PATH` and `$1/bin` from `PYTHONPATH`
 * `dev-status`: Prints the values of `PATH` and `PYTHONPATH`, as well as the contents of  all tracked stacks
 * `pushon`, `pushPATH`, `pushPYTHONPATH`: Prepends `$1` to the stack named `$2` (fixed to `PATH` and `PYTHONPATH` for the 2 other versions)

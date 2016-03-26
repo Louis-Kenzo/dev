@@ -9,6 +9,8 @@
 # Accessory functions and variables are prefixed by __; functions meant to be
 # used by the client are directly exposed:
 # - dev
+# - devbin
+# - devpy
 # - undev
 # - dev-status
 # - pushon
@@ -32,18 +34,29 @@
 ## Returns error-code 1 if both paths are already on their respective stacks.
 
 dev() {
-	local IFS=$'\n'
-	local root="$(readlink -m "${1:-.}")"
-	if __dev_isInStack "$root" __DEV_DEVS; then
-		echo "$(tput bold)$root$(tput sgr0) $(tput setaf 3)already in dev$(tput sgr0)"
-		return 1
-	fi
-
+	local root=${1:-.}
 	declare -a NEW_DEV=("$root")
-	NEW_DEV+=(PATH "$root/bin")
-	NEW_DEV+=(PYTHONPATH "$root")
+	if [ -f "$root/setup.py" ] && [ -d "$root/bin" ]; then
+		NEW_DEV+=(PATH "$root/bin")
+		NEW_DEV+=(PYTHONPATH "$root")
+	else
+		NEW_DEV+=(PATH "$root")
+	fi
+	__addDev NEW_DEV[@]
+}
 
-	__dev_pushonDev NEW_DEV[@]
+devbin() {
+	local root=${1:-.}
+	declare -a NEW_DEV=("$root")
+	NEW_DEV+=(PATH "$root")
+	__addDev NEW_DEV[@]
+}
+
+devpy() {
+	local root=${1:-.}
+	declare -a NEW_DEV=("$root")
+	NEW_DEV+=(PYTHONPATH "$root")
+	__addDev NEW_DEV[@]
 }
 
 ## Pops $1/bin and $1 (or by default ./bin and .) from PATH and PYTHONPATH
@@ -363,6 +376,19 @@ __dev_hasDev() {
 		if [ "$(__dev_devRoot $dev_component)" = "$2" ]; then return 0; fi
 	done
 	return 1
+}
+
+__addDev() {
+	declare -a FORWARDED_DEV=("${!1}")
+
+	FORWARDED_DEV[0]="$(readlink -m "${FORWARDED_DEV[0]}")"
+	local root="FORWARDED_DEV[0]"
+	if __dev_isInStack "$root" __DEV_DEVS; then
+		echo "$(tput bold)$root$(tput sgr0) $(tput setaf 3)already in dev$(tput sgr0)"
+		return 1
+	fi
+
+	__dev_pushonDev FORWARDED_DEV[@]
 }
 
 __dev_pushonDev() {
